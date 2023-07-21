@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+        - name: analytics-service
+          image: iad.ocir.io/idq7snkhlnmv/emyt-plus-analytics-service:10-analytics-service
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8090
+          env:
+          - name: PORT
+            value: "8090"
+          - name: DBUSER
+            value: "cassandra"
+          - name: DBPASS
+            value: "cassandra"
+          - name: CASSANDRA_PORT
+            value: "9042" 
+          - name: JWT_SECRET
+            value: "TENSORGOSECRETKEYENCRYPTED"
+          - name: CASSANDRA
+            value: "129.213.110.102" 
+          - name: KEYSPACE
+            value: "testkeyspace" 
+          - name: FETCH_SIZE
+            value: "5000"
+          - name: KEY_EXPIRY
+            value: "2023-11-30T20:13:40.220Z"                         
+          - name: KEY
+            value: "pUuZ3nd2oqU22a8Mrjhc8V6zNB1axJkH"
+          - name: KEY_API
+            value: "https://eypapi.tensorgo.com/userapi-services/api-user/"
+      imagePullSecrets:
+        - name: ocirsecret
+      nodeSelector:
+        accelerator: microservices        
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+spec:
+  type: ClusterIP
+  selector:
+    app: analytics-service
+  ports:
+    - port: 8090
+      protocol: TCP
+      targetPort: 8090
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: analytics-service
+  namespace: default
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - istio-system/ashburn-cluster-gateway
+  http:
+  - name: analytics-service
+    match:
+    - uri:
+        prefix: /analytics-service
+    route:
+    - destination:
+        host: analytics-service.default.svc.cluster.local
+        port:
+          number: 8090
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: analytics-service
+  namespace: default
+spec:
+  host: analytics-service.default.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: DISABLE
